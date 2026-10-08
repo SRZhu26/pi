@@ -44,6 +44,11 @@ export function createDockerExecutor(options: MiddlemanagerDockerOptions): Middl
 		const stdoutPath = join(directory, "docker.stdout.log");
 		const stderrPath = join(directory, "docker.stderr.log");
 		const taskPath = "/work/task-repo";
+		const launchArgs = launch.args.map((arg) =>
+			arg === "packages/coding-agent/examples/extensions/middlemanager/index.ts"
+				? "/opt/pi/packages/coding-agent/examples/extensions/middlemanager/index.ts"
+				: arg,
+		);
 		const environment = {
 			...launch.environment,
 			PI_MODEL_BASE_URL: protocol.modelConfiguration.baseUrl as string,
@@ -56,7 +61,7 @@ export function createDockerExecutor(options: MiddlemanagerDockerOptions): Middl
 				outputFile: "/artifacts/worker.json",
 				cliPath: options.cliPath,
 				cwd: taskPath,
-				args: launch.args,
+				args: launchArgs,
 				environment,
 				prompt: task.prompt,
 				timeoutMs: options.timeoutMs ?? 3_600_000,
