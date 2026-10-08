@@ -112,7 +112,7 @@ function toPiClassifierModel(
 		api: decision ? "typesafe-system-one" : "llama-cpp-classify",
 		provider: LLAMA_PROVIDER_ID,
 		baseUrl: decision ? llamaInferenceUrl(serverUrl) : serverUrl,
-		input: ["text"],
+		input: decision && model.architecture?.input_modalities?.includes("image") ? ["text", "image"] : ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow: contextWindowOf(model, cachedContextWindow),
 	};

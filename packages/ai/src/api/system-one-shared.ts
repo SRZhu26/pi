@@ -13,6 +13,7 @@ import { isRecord, parseClassifierUsage, postClassifierRequest, requiredNumber }
 export interface SystemOneWireRequest {
 	state: ClassifierContext["state"];
 	questions: Record<string, unknown>;
+	images?: string[];
 }
 
 /** Differences between services that serve System One models. */
@@ -86,6 +87,9 @@ function parseAnswers(label: string, value: unknown, context: ClassifierContext)
 function wireRequest(context: ClassifierContext): SystemOneWireRequest {
 	return {
 		state: context.state,
+		...(context.images?.length
+			? { images: context.images.map((image) => `data:${image.mimeType};base64,${image.data}`) }
+			: {}),
 		questions: Object.fromEntries(
 			Object.entries(context.questions).map(([id, question]) => [
 				id,
@@ -113,7 +117,9 @@ export async function classifySystemOne(
 
 	try {
 		if (model.api !== transport.api) throw new Error(`Unsupported classifier API: ${model.api}`);
-		if (context.images?.length) throw new Error(`${transport.label} does not support image input`);
+		if (context.images?.length && !model.input.includes("image")) {
+			throw new Error(`${transport.label} does not support image input`);
+		}
 		const body = await postClassifierRequest(
 			transport.label,
 			transport.url(model),

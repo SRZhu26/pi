@@ -1,0 +1,25 @@
+{
+	"schemaVersion": 1,
+	"tasks": [
+		{
+			"id": "optimization/replace-with-stable-id",
+			"domain": "optimization",
+			"prompt": "Replace this with a frozen optimization task and explicit measurable target.",
+			"acceptanceCriteria": ["Replace with deterministic correctness checks"],
+			"measurement": {
+				"command": "Replace with a deterministic benchmark command",
+				"baseline": 100,
+				"target": 80,
+				"direction": "minimize",
+				"unit": "ms"
+			}
+		},
+		{
+			"id": "goal/replace-with-stable-id",
+			"domain": "goal",
+			"prompt": "Replace this with a frozen task that has explicit acceptance criteria.",
+			"acceptanceCriteria": ["Replace with measurable requirements"],
+			"rubric": "Replace with a blinded, task-specific quality rubric."
+		}
+	]
+}

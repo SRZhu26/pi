@@ -123,7 +123,7 @@ describe("TypeSafe System One", () => {
 	it("rejects image input before sending", async () => {
 		const fetch = vi.fn(async () => Response.json({ answers: wireAnswers }));
 		const result = await classify(
-			{ ...model, input: ["text", "image"] },
+			model,
 			{ ...context, images: [{ type: "image", data: "aW1hZ2U=", mimeType: "image/png" }] },
 			{ apiKey: "secret", fetch },
 		);
@@ -131,6 +131,34 @@ describe("TypeSafe System One", () => {
 		expect(fetch).not.toHaveBeenCalled();
 		expect(result.stopReason).toBe("error");
 		expect(result.errorMessage).toBe("System One API does not support image input");
+	});
+
+	it("sends image data URLs", async () => {
+		let requestBody: Record<string, unknown> | undefined;
+		const result = await classify(
+			{ ...model, input: ["text", "image"] },
+			{
+				state: { task: "Check the rendered button" },
+				images: [{ type: "image", data: "aW1hZ2U=", mimeType: "image/png" }],
+				questions: {
+					approved: {
+						type: "bool",
+						instructions: "Is the result acceptable?",
+						criteria: { true: "acceptable", false: "unacceptable" },
+					},
+				},
+			},
+			{
+				apiKey: "secret",
+				fetch: async (_input, init) => {
+					requestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+					return Response.json({ answers: { approved: { type: "noul", noul: 0.8 } } });
+				},
+			},
+		);
+
+		expect(requestBody?.images).toEqual(["data:image/png;base64,aW1hZ2U="]);
+		expect(result.answers.approved).toEqual({ type: "bool", probability: 0.8 });
 	});
 
 	it("merges headers case-insensitively and supports null suppression", async () => {

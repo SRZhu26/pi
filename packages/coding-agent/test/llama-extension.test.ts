@@ -398,13 +398,13 @@ describe("llama.cpp extension", () => {
 							{
 								id: "qwen",
 								status: { value: "loaded" },
-								architecture: { input_modalities: ["text"], output_modalities: ["text"] },
+								architecture: { input_modalities: ["text", "image"], output_modalities: ["text"] },
 								meta: { n_ctx: 32768 },
 							},
 							{
 								id: "kev",
 								status: { value: "loaded" },
-								architecture: { input_modalities: ["text"], output_modalities: ["decisions"] },
+								architecture: { input_modalities: ["text", "image"], output_modalities: ["decisions"] },
 								meta: { n_ctx: 8192 },
 							},
 							{
@@ -461,6 +461,9 @@ describe("llama.cpp extension", () => {
 		expect(systemOneRequests).toEqual([]);
 		expect(propsModels.sort()).toEqual(["legacy", "qwen"]);
 		expect(controller.provider.getModels().map((model) => model.id)).toEqual(["qwen", "legacy"]);
+		const qwenClassifier = controller.provider.getAllModels?.().find((model) => model.id === "qwen");
+		if (qwenClassifier?.type !== "classifier") throw new Error("missing chat classifier model");
+		expect(qwenClassifier.input).toEqual(["text"]);
 		expect(cachedEntry?.models.map((model) => [model.id, model.api, model.baseUrl])).toEqual([
 			["qwen", "openai-completions", `${url}/v1`],
 			["legacy", "openai-completions", `${url}/v1`],
@@ -473,10 +476,12 @@ describe("llama.cpp extension", () => {
 		const kev = controller.provider.getAllModels?.().find((model) => model.id === "kev");
 		if (kev?.type !== "classifier") throw new Error("missing decision classifier model");
 		expect(kev.contextWindow).toBe(8192);
+		expect(kev.input).toEqual(["text", "image"]);
 		const result = await controller.provider.classify!(
 			kev,
 			{
 				state: { message: "I was charged twice." },
+				images: [{ type: "image", data: "aW1hZ2U=", mimeType: "image/jpeg" }],
 				questions: {
 					angry: {
 						type: "bool",
@@ -494,6 +499,7 @@ describe("llama.cpp extension", () => {
 			{
 				model: "kev",
 				state: { message: "I was charged twice." },
+				images: ["data:image/jpeg;base64,aW1hZ2U="],
 				questions: {
 					angry: {
 						type: "noul",
@@ -525,6 +531,9 @@ describe("llama.cpp extension", () => {
 			["laya", "typesafe-system-one"],
 			["legacy", "llama-cpp-classify"],
 		]);
+		const restoredKev = restored.provider.getAllModels?.().find((model) => model.id === "kev");
+		if (restoredKev?.type !== "classifier") throw new Error("missing cached decision classifier model");
+		expect(restoredKev.input).toEqual(["text", "image"]);
 	});
 
 	it("lists decision models that also output text for chat", () => {

@@ -1,0 +1,98 @@
+{
+	"schemaVersion": 1,
+	"arms": [
+		{
+			"id": "vanilla-pi",
+			"kind": "baseline",
+			"domains": ["optimization", "goal"],
+			"features": []
+		},
+		{
+			"id": "middlemanager-full",
+			"kind": "middlemanager",
+			"domains": ["optimization", "goal"],
+			"features": [
+				"task_difficulty",
+				"memory_selection",
+				"bash_guardrails",
+				"edit_alignment",
+				"goal_adherence",
+				"bounded_autopilot",
+				"visual_review"
+			],
+			"shadow": false
+		},
+		{
+			"id": "middlemanager-no-task-difficulty",
+			"kind": "middlemanager",
+			"domains": ["optimization", "goal"],
+			"features": ["memory_selection", "bash_guardrails", "edit_alignment", "goal_adherence", "bounded_autopilot", "visual_review"],
+			"shadow": false,
+			"ablates": "task_difficulty"
+		},
+		{
+			"id": "middlemanager-no-memory-selection",
+			"kind": "middlemanager",
+			"domains": ["optimization", "goal"],
+			"features": ["task_difficulty", "bash_guardrails", "edit_alignment", "goal_adherence", "bounded_autopilot", "visual_review"],
+			"shadow": false,
+			"ablates": "memory_selection"
+		},
+		{
+			"id": "middlemanager-no-bash-guardrails",
+			"kind": "middlemanager",
+			"domains": ["optimization", "goal"],
+			"features": ["task_difficulty", "memory_selection", "edit_alignment", "goal_adherence", "bounded_autopilot", "visual_review"],
+			"shadow": false,
+			"ablates": "bash_guardrails"
+		},
+		{
+			"id": "middlemanager-no-edit-alignment",
+			"kind": "middlemanager",
+			"domains": ["optimization", "goal"],
+			"features": ["task_difficulty", "memory_selection", "bash_guardrails", "goal_adherence", "bounded_autopilot", "visual_review"],
+			"shadow": false,
+			"ablates": "edit_alignment"
+		},
+		{
+			"id": "middlemanager-no-goal-adherence",
+			"kind": "middlemanager",
+			"domains": ["optimization", "goal"],
+			"features": ["task_difficulty", "memory_selection", "bash_guardrails", "edit_alignment", "bounded_autopilot", "visual_review"],
+			"shadow": false,
+			"ablates": "goal_adherence"
+		},
+		{
+			"id": "middlemanager-no-bounded-autopilot",
+			"kind": "middlemanager",
+			"domains": ["optimization", "goal"],
+			"features": ["task_difficulty", "memory_selection", "bash_guardrails", "edit_alignment", "goal_adherence", "visual_review"],
+			"shadow": false,
+			"ablates": "bounded_autopilot"
+		},
+		{
+			"id": "middlemanager-no-visual-review",
+			"kind": "middlemanager",
+			"domains": ["optimization", "goal"],
+			"features": ["task_difficulty", "memory_selection", "bash_guardrails", "edit_alignment", "goal_adherence", "bounded_autopilot"],
+			"shadow": false,
+			"ablates": "visual_review"
+		},
+		{
+			"id": "pi-autoresearch",
+			"kind": "external",
+			"domains": ["optimization"],
+			"features": [],
+			"repository": "https://github.com/davebcn87/pi-autoresearch",
+			"ref": "main"
+		},
+		{
+			"id": "pi-goal-x",
+			"kind": "external",
+			"domains": ["goal"],
+			"features": [],
+			"repository": "https://github.com/tmonk/pi-goal-x",
+			"ref": "main"
+		}
+	]
+}
