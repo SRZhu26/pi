@@ -1,35 +1,39 @@
-# Middlemanager Experiments
+# Middlemanager SWE-bench Lite Experiments
 
-This experiment matrix separates optimization tasks from general goal tasks. The built-in cohort contains vanilla Pi, full Middlemanager, and one leave-one-feature-out arm for each of the seven capabilities. `pi-autoresearch` is only assigned to optimization tasks; `pi-goal-x` is only assigned to goal tasks.
+The experiment uses the pinned `princeton-nlp/SWE-bench_Lite` dataset revision `6ec7bb89b9342f664a54a6e0a6ea6501d3437cc2`, configuration `default`, test split (300 instances). The primary score is the official SWE-bench `resolved` result, not a text judge.
 
-## Freeze A Task Set
+## Arms
 
-Copy `tasks.template.json` to a versioned task file and replace every placeholder. Each task needs a stable ID, a frozen prompt, acceptance criteria, and a task-specific evaluation. Optimization tasks must specify a deterministic benchmark command, baseline, target, direction, and unit. Goal tasks must include a rubric suitable for blinded scoring. Do not compare optimization and goal results as one headline.
+There are nine paired arms for every issue:
 
-Record the starting Pi commit, coding model, classifier model, comparator commit SHAs, benchmark environment, and task-set hash with every run. The external comparators in `arms.json` are pinned to full commit SHAs; update those pins deliberately when selecting a new comparator revision.
+- `pi-no-extensions`: raw Pi with extension discovery and built-in extensions disabled.
+- Seven `middlemanager-add-*` arms: raw Pi plus exactly one Middlemanager feature.
+- `middlemanager-full`: all seven features enabled.
 
-## Feature Environment
+Every treatment uses `--no-extensions --extension packages/coding-agent/examples/extensions/middlemanager/index.ts`; the baseline uses only `--no-extensions`. This excludes ambient/user extensions from all arms. Feature booleans come from `PI_MIDDLEMANAGER_*`, not `--flag=false` CLI arguments.
 
-The Middlemanager extension reads `PI_MIDDLEMANAGER_*` defaults so arms can independently enable or disable features. A CLI presence flag may turn a boolean on, so ablation launchers should use these environment variables rather than `--flag=false`. The protocol planner emits these settings for each Middlemanager arm.
+## Freeze Tasks And Plan
 
-## Generate A Protocol
-
-After freezing a task file, generate the randomized plan from the repository root:
+The downloader fetches the pinned `data/test-00000-of-00001.parquet` artifact through `hf-mirror.com`, and reads only instance ID, repository, base commit, issue text, version, and optional environment setup commit. Reference patches, hints, and hidden test lists are never decoded into the task set.
 
 ```powershell
-$env:PI_MIDDLEMANAGER_MODEL = "provider/classifier-model"
+$env:HF_ENDPOINT = "https://hf-mirror.com"
+$env:HF_HUB_OFFLINE = "0"
+$env:NODE_USE_ENV_PROXY = "1"
+npm run eval:middlemanager:dataset --workspace=@earendil-works/pi-evals -- --output .eval/middlemanager/swebench-lite-v1.json
+
 npm run eval:middlemanager:plan --workspace=@earendil-works/pi-evals -- `
-	--tasks experiments/middlemanager/tasks-v1.json `
-	--model provider/coding-model `
-	--classifier-model provider/classifier-model `
-	--repetitions 3 `
+	--tasks .eval/middlemanager/swebench-lite-v1.json `
+	--repetitions 1 `
 	--seed 20261008
 ```
 
-The output defaults to `packages/evals/.eval/middlemanager/` and contains a protocol and a pending-observation manifest. A protocol is a plan, not evidence that any arm ran.
+The default coding and classifier model is `openai/Qwen3.8-Flash-Next-FP8` at `http://172.16.125.60:30000/v1`, with a 262,144-token context, temperature 1, 32,768 maximum output tokens, and one concurrent run. Each arm launch sets both `NO_PROXY` and `no_proxy` to include `172.16.125.60`. Override models explicitly only for a separately versioned experiment.
 
-## Metrics And Execution
+One repetition schedules 2,700 agent runs (300 issues × 9 arms). The planner writes a protocol and pending-observation manifest; it does not launch Pi or run the SWE-bench evaluator. Run agent requests from ReachyBot with proxy bypass for `172.16.125.60`.
 
-Randomize arm order within each `(task, repetition)` block with a recorded seed. Run every arm in a fresh worktree or isolated container from the same base commit. Keep model, tools, timeouts, and resource limits equal where the comparator permits. Count user interventions and safety blocks as outcomes, not missing data. Report acceptance-test success, blinded quality score, wall time, tool calls, coding-model tokens and cost, classifier usage and cost, and local classifier latency/hardware separately when usage is unavailable.
+## Execution And Reporting
 
-The plan CLI only validates the task set and writes a reproducible randomized protocol; it does not execute model tasks or grade outputs. Execution must use the isolated Pi eval harness and an explicit scorer. No experiment results should be reported until the task set, scorers, comparator revisions, and execution adapter are frozen.
+Run every arm from the exact task base commit in a fresh isolated SWE-bench environment. Keep the coding model, classifier, tool set, budgets, and environment image fixed. Randomize arm order within each issue/repetition block. Collect final patches and score them with the official SWE-bench harness at the pinned dataset revision. Report resolved rate and paired per-issue outcomes; also record wall time, model tokens/cost, classifier calls/latency/cost, tool calls, safety blocks, and feature invocation counts.
+
+SWE-bench Lite has no images, so `middlemanager-add-visual-review` is a no-image negative control and visual review is not exercised in the full arm. Bounded autopilot only has an effect if Pi calls `middlemanager_choose`; memory selection only acts when matching repository memory files are preloaded. Report these exposure counts and do not attribute a score change to a feature that did not activate.

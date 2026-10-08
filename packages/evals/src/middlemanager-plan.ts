@@ -4,11 +4,13 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-	createArmEnvironment,
+	createArmLaunchConfig,
 	createMultiArmTaskPlan,
+	MIDDLEMANAGER_FEATURES,
 	parseExperimentArms,
-	parseExperimentCases,
 	parseModelIdentity,
+	parseSweBenchLiteTaskSet,
+	SWE_BENCH_AGENT_MODEL,
 } from "./middlemanager-experiment.ts";
 
 interface CliOptions {
@@ -59,10 +61,12 @@ function parseArgs(args: readonly string[], environment: NodeJS.ProcessEnv): Cli
 
 	const taskFile = values.get("--tasks");
 	if (!taskFile) throw new Error("Pass --tasks with a frozen experiment task file; the template is not runnable.");
-	const model = values.get("--model") ?? [environment.PI_PROVIDER, environment.PI_MODEL].filter(Boolean).join("/");
-	const classifierModel = values.get("--classifier-model") ?? environment.PI_MIDDLEMANAGER_MODEL;
+	const model = values.get("--model") ?? `${SWE_BENCH_AGENT_MODEL.provider}/${SWE_BENCH_AGENT_MODEL.id}`;
+	const classifierModel =
+		values.get("--classifier-model") ??
+		environment.PI_MIDDLEMANAGER_MODEL ??
+		`${SWE_BENCH_AGENT_MODEL.provider}/${SWE_BENCH_AGENT_MODEL.id}`;
 	if (!model) throw new Error("Pass --model provider/model-id or set PI_PROVIDER and PI_MODEL.");
-	if (!classifierModel) throw new Error("Pass --classifier-model provider/model-id or set PI_MIDDLEMANAGER_MODEL.");
 	const repetitionsText = values.get("--repetitions") ?? environment.PI_MIDDLEMANAGER_REPETITIONS ?? "1";
 	const seedText = values.get("--seed") ?? environment.PI_MIDDLEMANAGER_SEED;
 	if (seedText === undefined)
@@ -97,9 +101,9 @@ function relativeToRepo(path: string): string {
 const options = parseArgs(process.argv.slice(2), process.env);
 const taskText = await readFile(options.tasksFile, "utf8");
 const armText = await readFile(options.armsFile, "utf8");
-const cases = parseExperimentCases(JSON.parse(taskText));
+const taskSet = parseSweBenchLiteTaskSet(JSON.parse(taskText));
 const arms = parseExperimentArms(JSON.parse(armText));
-const tasks = createMultiArmTaskPlan(cases, arms, options.repetitions, options.seed);
+const tasks = createMultiArmTaskPlan(taskSet.tasks, arms, options.repetitions, options.seed);
 const runId = `${new Date().toISOString().replaceAll(":", "-")}_${randomUUID()}`;
 const outputFile = options.outputFile ?? resolve(packageRoot, ".eval", "middlemanager", runId, "protocol.json");
 const inputHashes = {
@@ -110,8 +114,9 @@ const expectedObservations = tasks.map((task) => ({
 	...task,
 	status: "pending",
 	metrics: {
-		acceptancePassed: null,
-		qualityScore: null,
+		resolved: null,
+		patchProduced: null,
+		patchApplySuccess: null,
 		wallTimeMs: null,
 		codingModelInputTokens: null,
 		codingModelOutputTokens: null,
@@ -124,34 +129,87 @@ const expectedObservations = tasks.map((task) => ({
 		toolCalls: null,
 		userInterventions: null,
 		safetyBlocks: null,
-		benchmarkValue: null,
+		featureInvocations: Object.fromEntries(MIDDLEMANAGER_FEATURES.map((feature) => [feature, null])),
 	},
 }));
-const environmentByArm = Object.fromEntries(
-	arms.map((arm) => [arm.id, createArmEnvironment(arm, options.classifierModel)]),
+const noProxy = [
+	...new Set(
+		[process.env.NO_PROXY, process.env.no_proxy, SWE_BENCH_AGENT_MODEL.noProxyHost]
+			.flatMap((value) => value?.split(",") ?? [])
+			.map((host) => host.trim())
+			.filter(Boolean),
+	),
+].join(",");
+const launchConfigByArm = Object.fromEntries(
+	arms.map((arm) => {
+		const launchConfig = createArmLaunchConfig(arm, options.classifierModel);
+		return [
+			arm.id,
+			{
+				...launchConfig,
+				environment: {
+					...launchConfig.environment,
+					PI_PROVIDER: SWE_BENCH_AGENT_MODEL.provider,
+					PI_MODEL: SWE_BENCH_AGENT_MODEL.id,
+					PI_MIDDLEMANAGER_MODEL: options.classifierModel,
+					OPENAI_API_KEY: "local",
+					NO_PROXY: noProxy,
+					no_proxy: noProxy,
+				},
+			},
+		];
+	}),
 );
 const protocolBody = {
-	schemaVersion: 1,
-	kind: "middlemanager-ablation-protocol",
+	schemaVersion: 2,
+	kind: "middlemanager-swebench-lite-ablation-protocol",
 	createdAt: new Date().toISOString(),
 	piCommit: currentCommit(),
+	benchmark: taskSet.benchmark,
 	model: options.model,
 	classifierModel: options.classifierModel,
+	modelConfiguration: {
+		provider: SWE_BENCH_AGENT_MODEL.provider,
+		baseUrl: SWE_BENCH_AGENT_MODEL.baseUrl,
+		apiKey: "local",
+		models: [
+			{
+				id: SWE_BENCH_AGENT_MODEL.id,
+				name: SWE_BENCH_AGENT_MODEL.name,
+				api: SWE_BENCH_AGENT_MODEL.api,
+				reasoning: false,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: SWE_BENCH_AGENT_MODEL.contextWindow,
+				maxTokens: SWE_BENCH_AGENT_MODEL.maxTokens,
+				samplingParams: SWE_BENCH_AGENT_MODEL.samplingParams,
+			},
+		],
+	},
 	repetitions: options.repetitions,
 	seed: options.seed,
+	maxConcurrentRuns: SWE_BENCH_AGENT_MODEL.maxConcurrentRuns,
+	noProxyHosts: noProxy.split(","),
 	inputFiles: {
 		tasks: relativeToRepo(options.tasksFile),
 		arms: relativeToRepo(options.armsFile),
 	},
 	inputHashes,
-	cases,
+	cases: taskSet.tasks,
 	arms,
-	environmentByArm,
+	launchConfigByArm,
+	execution: {
+		primaryMetric: "resolved",
+		evaluator: "SWE-bench official test harness",
+		pairedBy: "instanceId#repetition",
+		plannedRuns: taskSet.tasks.length * arms.length * options.repetitions,
+	},
 	tasks,
 	expectedObservations,
 	metrics: [
-		"acceptancePassed",
-		"qualityScore",
+		"resolved",
+		"patchProduced",
+		"patchApplySuccess",
 		"wallTimeMs",
 		"codingModelInputTokens",
 		"codingModelOutputTokens",
@@ -164,7 +222,7 @@ const protocolBody = {
 		"toolCalls",
 		"userInterventions",
 		"safetyBlocks",
-		"benchmarkValue",
+		"featureInvocations",
 	],
 };
 const protocolDigest = sha256(JSON.stringify(protocolBody));
@@ -177,4 +235,4 @@ await writeFile(
 );
 console.log(`Protocol: ${outputFile}`);
 console.log(`Protocol SHA-256: ${protocolDigest}`);
-console.log(`Tasks: ${cases.length}; planned runs: ${tasks.length}; seed: ${options.seed}`);
+console.log(`Instances: ${taskSet.tasks.length}; planned runs: ${tasks.length}; seed: ${options.seed}`);

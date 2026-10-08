@@ -1,16 +1,34 @@
 {
-	"schemaVersion": 1,
+	"schemaVersion": 2,
+	"benchmark": {
+		"id": "swe-bench-lite",
+		"dataset": "princeton-nlp/SWE-bench_Lite",
+		"revision": "6ec7bb89b9342f664a54a6e0a6ea6501d3437cc2",
+		"config": "default",
+		"split": "test",
+		"expectedInstances": 300
+	},
+	"featureExposure": {
+		"task_difficulty": "runs during task intake when a classifier is configured",
+		"memory_selection": "acts only when repository memory files are preloaded",
+		"bash_guardrails": "acts on bash or PowerShell tool calls",
+		"edit_alignment": "acts on edit or write tool calls",
+		"goal_adherence": "acts on tool calls and task settlement",
+		"bounded_autopilot": "acts only when the agent calls middlemanager_choose",
+		"visual_review": "not exercisable: SWE-bench Lite supplies no images"
+	},
 	"arms": [
-		{
-			"id": "vanilla-pi",
-			"kind": "baseline",
-			"domains": ["optimization", "goal"],
-			"features": []
-		},
+		{"id": "pi-no-extensions", "kind": "baseline", "features": []},
+		{"id": "middlemanager-add-task-difficulty", "kind": "middlemanager", "features": ["task_difficulty"], "shadow": false},
+		{"id": "middlemanager-add-memory-selection", "kind": "middlemanager", "features": ["memory_selection"], "shadow": false},
+		{"id": "middlemanager-add-bash-guardrails", "kind": "middlemanager", "features": ["bash_guardrails"], "shadow": false},
+		{"id": "middlemanager-add-edit-alignment", "kind": "middlemanager", "features": ["edit_alignment"], "shadow": false},
+		{"id": "middlemanager-add-goal-adherence", "kind": "middlemanager", "features": ["goal_adherence"], "shadow": false},
+		{"id": "middlemanager-add-bounded-autopilot", "kind": "middlemanager", "features": ["bounded_autopilot"], "shadow": false},
+		{"id": "middlemanager-add-visual-review", "kind": "middlemanager", "features": ["visual_review"], "shadow": false},
 		{
 			"id": "middlemanager-full",
 			"kind": "middlemanager",
-			"domains": ["optimization", "goal"],
 			"features": [
 				"task_difficulty",
 				"memory_selection",
@@ -21,78 +39,6 @@
 				"visual_review"
 			],
 			"shadow": false
-		},
-		{
-			"id": "middlemanager-no-task-difficulty",
-			"kind": "middlemanager",
-			"domains": ["optimization", "goal"],
-			"features": ["memory_selection", "bash_guardrails", "edit_alignment", "goal_adherence", "bounded_autopilot", "visual_review"],
-			"shadow": false,
-			"ablates": "task_difficulty"
-		},
-		{
-			"id": "middlemanager-no-memory-selection",
-			"kind": "middlemanager",
-			"domains": ["optimization", "goal"],
-			"features": ["task_difficulty", "bash_guardrails", "edit_alignment", "goal_adherence", "bounded_autopilot", "visual_review"],
-			"shadow": false,
-			"ablates": "memory_selection"
-		},
-		{
-			"id": "middlemanager-no-bash-guardrails",
-			"kind": "middlemanager",
-			"domains": ["optimization", "goal"],
-			"features": ["task_difficulty", "memory_selection", "edit_alignment", "goal_adherence", "bounded_autopilot", "visual_review"],
-			"shadow": false,
-			"ablates": "bash_guardrails"
-		},
-		{
-			"id": "middlemanager-no-edit-alignment",
-			"kind": "middlemanager",
-			"domains": ["optimization", "goal"],
-			"features": ["task_difficulty", "memory_selection", "bash_guardrails", "goal_adherence", "bounded_autopilot", "visual_review"],
-			"shadow": false,
-			"ablates": "edit_alignment"
-		},
-		{
-			"id": "middlemanager-no-goal-adherence",
-			"kind": "middlemanager",
-			"domains": ["optimization", "goal"],
-			"features": ["task_difficulty", "memory_selection", "bash_guardrails", "edit_alignment", "bounded_autopilot", "visual_review"],
-			"shadow": false,
-			"ablates": "goal_adherence"
-		},
-		{
-			"id": "middlemanager-no-bounded-autopilot",
-			"kind": "middlemanager",
-			"domains": ["optimization", "goal"],
-			"features": ["task_difficulty", "memory_selection", "bash_guardrails", "edit_alignment", "goal_adherence", "visual_review"],
-			"shadow": false,
-			"ablates": "bounded_autopilot"
-		},
-		{
-			"id": "middlemanager-no-visual-review",
-			"kind": "middlemanager",
-			"domains": ["optimization", "goal"],
-			"features": ["task_difficulty", "memory_selection", "bash_guardrails", "edit_alignment", "goal_adherence", "bounded_autopilot"],
-			"shadow": false,
-			"ablates": "visual_review"
-		},
-		{
-			"id": "pi-autoresearch",
-			"kind": "external",
-			"domains": ["optimization"],
-			"features": [],
-			"repository": "https://github.com/davebcn87/pi-autoresearch",
-			"ref": "04b8a50dac7efe80ffc91648bd00ed9b022e24c2"
-		},
-		{
-			"id": "pi-goal-x",
-			"kind": "external",
-			"domains": ["goal"],
-			"features": [],
-			"repository": "https://github.com/tmonk/pi-goal-x",
-			"ref": "64c5ace87f3400c0b55ef87f2d2912167f53dbaa"
 		}
 	]
 }
