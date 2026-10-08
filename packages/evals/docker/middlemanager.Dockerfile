@@ -7,6 +7,6 @@ RUN apt-get update \
 WORKDIR /opt/pi
 COPY . .
 RUN npm ci --ignore-scripts \
-	&& npm run build
+	&& npm run build:offline
 
 WORKDIR /work
