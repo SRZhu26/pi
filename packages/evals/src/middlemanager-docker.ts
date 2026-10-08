@@ -51,21 +51,19 @@ export function createDockerExecutor(options: MiddlemanagerDockerOptions): Middl
 			NO_PROXY: [launch.environment.NO_PROXY, "127.0.0.1", "localhost"].filter(Boolean).join(","),
 			no_proxy: [launch.environment.no_proxy, "127.0.0.1", "localhost"].filter(Boolean).join(","),
 		};
-		await writeFile(
-			inputPath,
-			`${JSON.stringify(
-				{
-					outputFile: "/artifacts/worker.json",
-					cliPath: options.cliPath,
-					cwd: taskPath,
-					args: launch.args,
-					environment,
-					prompt: task.prompt,
-					timeoutMs: options.timeoutMs ?? 3_600_000,
-				},
-				 null,
-			)}\n`,
+		const workerInput = JSON.stringify(
+			{
+				outputFile: "/artifacts/worker.json",
+				cliPath: options.cliPath,
+				cwd: taskPath,
+				args: launch.args,
+				environment,
+				prompt: task.prompt,
+				timeoutMs: options.timeoutMs ?? 3_600_000,
+			},
+			null
 		);
+		await writeFile(inputPath, `${workerInput}\n`);
 		const envArgs = Object.entries(environment).flatMap(([key, value]) => ["-e", `${key}=${value}`]);
 		const command = [
 			"set -eu",
@@ -86,7 +84,7 @@ export function createDockerExecutor(options: MiddlemanagerDockerOptions): Middl
 			"3",
 			...envArgs,
 			"-v",
-			`${directory}:/artifacts",
+			`${directory}:/artifacts`,
 			options.image,
 			"bash",
 			"-lc",
@@ -100,10 +98,13 @@ export function createDockerExecutor(options: MiddlemanagerDockerOptions): Middl
 			await writeFile(stdoutPath, result.stdout);
 			await writeFile(stderrPath, result.stderr);
 		} catch (error) {
-			const failure = error as { stdout?: string; stderr?: string; message?: string };
-			await writeFile(stdoutPath, failure.stdout ?? "");
-			await writeFile(stderrPath, failure.stderr ?? failure.message ?? String(error));
-			throw new Error(`Docker task ${planned.instanceId}/${planned.armId} failed: ${failure.message ?? String(error)}`);
+			const failure = error as { stdout?: unknown; stderr?: unknown; message?: unknown };
+			const stdout = typeof failure.stdout === "string" ? failure.stdout : "";
+			const stderr = typeof failure.stderr === "string" ? failure.stderr : String(error);
+			const message = typeof failure.message === "string" ? failure.message : String(error);
+			await writeFile(stdoutPath, stdout);
+			await writeFile(stderrPath, stderr);
+			throw new Error(`Docker task ${planned.instanceId}/${planned.armId} failed: ${message}`);
 		}
 		const worker = JSON.parse(await readFile(workerPath, "utf8")) as Record<string, unknown>;
 		const patch = await readFile(patchPath, "utf8");
