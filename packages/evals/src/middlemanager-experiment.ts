@@ -322,7 +322,12 @@ export function createArmEnvironment(arm: ExperimentArm, classifierModel: string
 
 export function createArmLaunchConfig(arm: ExperimentArm, classifierModel: string) {
 	return {
-		args: ["--no-extensions", ...(arm.kind === "middlemanager" ? ["--extension", MIDDLEMANAGER_EXTENSION_PATH] : [])],
+		args: [
+			"--no-extensions",
+			...(arm.kind === "middlemanager"
+				? ["--extension", "builtin:llama.cpp", "--extension", MIDDLEMANAGER_EXTENSION_PATH]
+				: []),
+		],
 		environment: createArmEnvironment(arm, classifierModel),
 	};
 }
