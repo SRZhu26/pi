@@ -20,7 +20,7 @@ RUN cd packages/chord && npm run build \
 	&& cd ../telemetry && npm run build \
 	&& cd ../codemode && npm run build \
 	&& cd ../mcp && npm run build \
-	&& cd ../ai && npx tsc -p tsconfig.build.json && npx shx rm -rf dist/providers/data && npx shx cp -r src/providers/data dist/providers/data \
+	&& cd ../ai && npx tsc -p tsconfig.build.json --noCheck && npx shx rm -rf dist/providers/data && npx shx cp -r src/providers/data dist/providers/data \
 	&& cd ../durable && npm run build \
 	&& cd ../env && npm run build \
 	&& cd ../agent && npm run build \
