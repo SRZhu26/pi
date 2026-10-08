@@ -28,15 +28,43 @@ function addUsage(target: { input: number; output: number; cacheRead: number; ca
 	}
 }
 
+async function resolveClassifierModel(environment: Record<string, string>): Promise<Record<string, string>> {
+	const configured = environment.PI_MIDDLEMANAGER_MODEL;
+	const baseUrl = environment.LLAMA_BASE_URL;
+	if (!configured?.startsWith("llama.cpp/") || !baseUrl) return environment;
+	try {
+		const response = await fetch(`${baseUrl.replace(/\/+$/, "")}/models`);
+		if (!response.ok) return environment;
+		const payload = (await response.json()) as { data?: unknown; models?: unknown };
+		const models = [...(Array.isArray(payload.data) ? payload.data : []), ...(Array.isArray(payload.models) ? payload.models : [])].filter(
+			isRecord,
+		);
+		const configuredId = configured.slice("llama.cpp/".length);
+		const selected =
+			models.find(
+				(model) =>
+					model.id === configuredId ||
+					(Array.isArray(model.aliases) && model.aliases.includes(configuredId)),
+			) ?? models.find((model) => typeof model.id === "string");
+		if (typeof selected?.id === "string") {
+			return { ...environment, PI_MIDDLEMANAGER_MODEL: `llama.cpp/${selected.id}` };
+		}
+	} catch {
+		return environment;
+	}
+	return environment;
+}
+
 const inputPath = process.argv[2];
 if (!inputPath) throw new Error("Usage: middlemanager-pi-worker.ts <input.json>");
 const input = JSON.parse(await readFile(inputPath, "utf8")) as WorkerInput;
 const startedAt = Date.now();
 const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+const environment = await resolveClassifierModel(input.environment);
 const client = new RpcClient({
 	cliPath: input.cliPath,
 	cwd: input.cwd,
-	env: { ...input.environment, PI_CODING_AGENT_DIR: process.env.PI_CODING_AGENT_DIR ?? "/tmp/pi-agent" },
+	env: { ...environment, PI_CODING_AGENT_DIR: process.env.PI_CODING_AGENT_DIR ?? "/tmp/pi-agent" },
 	args: input.args,
 });
 
@@ -45,8 +73,8 @@ let result: Record<string, unknown>;
 try {
 	const agentDir = process.env.PI_CODING_AGENT_DIR ?? "/tmp/pi-agent";
 	await mkdir(agentDir, { recursive: true });
-	const modelId = input.environment.PI_MODEL;
-	const modelBaseUrl = input.environment.PI_MODEL_BASE_URL;
+	const modelId = environment.PI_MODEL;
+	const modelBaseUrl = environment.PI_MODEL_BASE_URL;
 	if (modelId && modelBaseUrl) {
 		await writeFile(
 			`${agentDir}/models.json`,
