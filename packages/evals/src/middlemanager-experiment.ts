@@ -94,7 +94,8 @@ export function parseExperimentArms(value: unknown): ExperimentArm[] {
 			throw new TypeError(`Experiment arm ${raw.id} requires at least one domain.`);
 		}
 		const domains = raw.domains.map(requireExperimentDomain);
-		if (new Set(domains).size !== domains.length) throw new TypeError(`Experiment arm ${raw.id} has duplicate domains.`);
+		if (new Set(domains).size !== domains.length)
+			throw new TypeError(`Experiment arm ${raw.id} has duplicate domains.`);
 		if (!Array.isArray(raw.features)) throw new TypeError(`Experiment arm ${raw.id} requires a feature list.`);
 		const features = raw.features.map((feature) => {
 			if (!MIDDLEMANAGER_FEATURES.includes(feature as MiddlemanagerFeature)) {
@@ -102,7 +103,8 @@ export function parseExperimentArms(value: unknown): ExperimentArm[] {
 			}
 			return feature as MiddlemanagerFeature;
 		});
-		if (new Set(features).size !== features.length) throw new TypeError(`Experiment arm ${raw.id} has duplicate features.`);
+		if (new Set(features).size !== features.length)
+			throw new TypeError(`Experiment arm ${raw.id} has duplicate features.`);
 		if (raw.kind === "middlemanager" && typeof raw.shadow !== "boolean") {
 			throw new TypeError(`Middlemanager arm ${raw.id} requires an explicit shadow setting.`);
 		}
@@ -193,7 +195,9 @@ export function parseExperimentCases(value: unknown): ExperimentCase[] {
 				!Number.isFinite(raw.measurement.target) ||
 				(raw.measurement.direction !== "minimize" && raw.measurement.direction !== "maximize")
 			) {
-				throw new TypeError(`Optimization task ${raw.id} requires a measurable baseline, target, direction, and command.`);
+				throw new TypeError(
+					`Optimization task ${raw.id} requires a measurable baseline, target, direction, and command.`,
+				);
 			}
 		} else if (typeof raw.rubric !== "string" || !raw.rubric.trim()) {
 			throw new TypeError(`Goal task ${raw.id} requires a scoring rubric.`);
@@ -234,7 +238,8 @@ export function createMultiArmTaskPlan(
 	seed: number,
 ): PlannedExperimentTask[] {
 	if (cases.length === 0) throw new TypeError("At least one experiment task is required.");
-	if (!Number.isSafeInteger(repetitions) || repetitions < 1) throw new TypeError("Repetitions must be a positive integer.");
+	if (!Number.isSafeInteger(repetitions) || repetitions < 1)
+		throw new TypeError("Repetitions must be a positive integer.");
 	if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffff_ffff) {
 		throw new TypeError("Seed must be an integer between 0 and 4294967295.");
 	}
@@ -246,10 +251,15 @@ export function createMultiArmTaskPlan(
 		return state / 0x1_0000_0000;
 	};
 	const tasks: PlannedExperimentTask[] = [];
-	const orderedCases = [...cases].sort((left, right) => left.domain.localeCompare(right.domain) || left.id.localeCompare(right.id));
+	const orderedCases = [...cases].sort(
+		(left, right) => left.domain.localeCompare(right.domain) || left.id.localeCompare(right.id),
+	);
 	for (const experimentCase of orderedCases) {
 		const eligibleArms = arms.filter((arm) => arm.domains.includes(experimentCase.domain));
-		if (!eligibleArms.some((arm) => arm.id === "vanilla-pi") || !eligibleArms.some((arm) => arm.id === "middlemanager-full")) {
+		if (
+			!eligibleArms.some((arm) => arm.id === "vanilla-pi") ||
+			!eligibleArms.some((arm) => arm.id === "middlemanager-full")
+		) {
 			throw new TypeError(`Task ${experimentCase.id} lacks a matched vanilla/full Middlemanager control.`);
 		}
 		for (let repetition = 1; repetition <= repetitions; repetition += 1) {
@@ -260,7 +270,14 @@ export function createMultiArmTaskPlan(
 			}
 			const blockId = `${experimentCase.id}#${repetition}`;
 			for (const [order, arm] of randomizedArms.entries()) {
-				tasks.push({ blockId, caseId: experimentCase.id, domain: experimentCase.domain, armId: arm.id, repetition, order });
+				tasks.push({
+					blockId,
+					caseId: experimentCase.id,
+					domain: experimentCase.domain,
+					armId: arm.id,
+					repetition,
+					order,
+				});
 			}
 		}
 	}

@@ -17,7 +17,6 @@ const MAX_STATE_CHARS = 12_000;
 const SENSITIVE_COMMAND =
 	/\b(?:sudo|shutdown|reboot|diskpart|format|terraform\s+destroy|kubectl\s+delete|npm\s+publish)\b|\bgit\s+push\b|\bgit\s+(?:clean|reset)\b.*(?:--hard|--force|\s-f\b)|\b(?:rm|remove-item|del|erase|rmdir)\b/i;
 
-type VisualMode = "auto" | "on" | "off";
 type Consequence = "low" | "medium" | "high";
 
 interface MemoryFile {
@@ -96,11 +95,7 @@ function classifierFor(pi: ExtensionAPI, ctx: ExtensionContext): ClassifierModel
 	if (typeof configured !== "string") return undefined;
 	const separator = configured.indexOf("/");
 	if (separator < 1 || separator === configured.length - 1) return undefined;
-	return ctx.modelRegistry.findOfType(
-		"classifier",
-		configured.slice(0, separator),
-		configured.slice(separator + 1),
-	);
+	return ctx.modelRegistry.findOfType("classifier", configured.slice(0, separator), configured.slice(separator + 1));
 }
 
 function recordAudit(pi: ExtensionAPI, data: Record<string, unknown>): void {
@@ -118,7 +113,12 @@ function summarizeAnswers(answers: Record<string, ClassifierAnswer>): Record<str
 		Object.entries(answers).map(([id, answer]) => [
 			id,
 			answer.type === "choice"
-				? { type: answer.type, choice: answer.choice, probabilities: answer.probabilities, confidence: answer.confidence }
+				? {
+						type: answer.type,
+						choice: answer.choice,
+						probabilities: answer.probabilities,
+						confidence: answer.confidence,
+					}
 				: answer.type === "score"
 					? { type: answer.type, score: answer.score, confidence: answer.confidence }
 					: { type: answer.type, probability: answer.probability },
@@ -200,10 +200,7 @@ function requiresReview(answers: Record<string, ClassifierAnswer> | undefined): 
 
 const BoundedChoiceParams = Type.Object({
 	question: Type.String({ description: "The decision to make from the supplied bounded options" }),
-	options: Type.Array(
-		Type.Object({ id: Type.String(), description: Type.String() }),
-		{ minItems: 2, maxItems: 8 },
-	),
+	options: Type.Array(Type.Object({ id: Type.String(), description: Type.String() }), { minItems: 2, maxItems: 8 }),
 	reversible: Type.Boolean({ description: "Whether the selected option can be undone without lasting impact" }),
 	consequence: Type.Union([Type.Literal("low"), Type.Literal("medium"), Type.Literal("high")]),
 });
@@ -264,7 +261,9 @@ export default function middlemanager(pi: ExtensionAPI) {
 				event.systemPromptOptions.contextFiles = ranked;
 				recordAudit(pi, {
 					feature: "memory_selection",
-					selected: ranked.filter((file) => isMemoryFile(file.path)).map((file) => file.path.split(/[\\/]/).at(-1)),
+					selected: ranked
+						.filter((file) => isMemoryFile(file.path))
+						.map((file) => file.path.split(/[\\/]/).at(-1)),
 					decision: "ranked",
 				});
 			}
@@ -305,7 +304,11 @@ export default function middlemanager(pi: ExtensionAPI) {
 		const canSeeImages = model.input.includes("image");
 		const useImages = wantsVisual && canSeeImages && Boolean(event.images?.length);
 		if (visualMode === "auto" && event.images?.length && !canSeeImages) {
-			recordAudit(pi, { feature: "visual_review", decision: "disabled", reason: "selected classifier does not support images" });
+			recordAudit(pi, {
+				feature: "visual_review",
+				decision: "disabled",
+				reason: "selected classifier does not support images",
+			});
 		}
 		if (visualMode === "on" && (!canSeeImages || !event.images?.length)) {
 			const reason = !canSeeImages ? "selected classifier does not support images" : "no image was supplied";
@@ -339,43 +342,56 @@ export default function middlemanager(pi: ExtensionAPI) {
 
 		const lines: string[] = [];
 		const taskType = answers.task_type;
-		if (taskType?.type === "choice" && taskType.confidence >= 0.65) lines.push(`Task type estimate: ${taskType.choice}.`);
+		if (taskType?.type === "choice" && taskType.confidence >= 0.65)
+			lines.push(`Task type estimate: ${taskType.choice}.`);
 		const difficulty = answers.task_difficulty;
 		if (difficulty?.type === "score" && difficulty.confidence >= 0.65) {
-			const level = ["routine", "moderate", "complex", "high-stakes"][Math.max(0, Math.min(3, Math.round(difficulty.score)))];
+			const level = ["routine", "moderate", "complex", "high-stakes"][
+				Math.max(0, Math.min(3, Math.round(difficulty.score)))
+			];
 			lines.push(`Task difficulty estimate: ${level}.`);
 		}
 		const visual = answers.visual_review;
-		if (visual?.type === "choice" && visual.confidence >= 0.65) lines.push(`Visual evidence estimate: ${visual.choice}.`);
+		if (visual?.type === "choice" && visual.confidence >= 0.65)
+			lines.push(`Visual evidence estimate: ${visual.choice}.`);
 		if (lines.length > 0) event.systemPromptOptions.sections.middlemanager = lines.join("\n");
 		return undefined;
 	});
 
 	pi.on("agent_before_settle", async (event, ctx) => {
-		if (
-			pi.getFlag("middlemanager-goal-adherence") === false ||
-			event.outcome !== "completed"
-		) {
+		if (pi.getFlag("middlemanager-goal-adherence") === false || event.outcome !== "completed") {
 			return undefined;
 		}
 		const shadow = pi.getFlag("middlemanager-shadow") !== false;
 		const model = classifierFor(pi, ctx);
 		if (!model) return undefined;
-		const answers = await classifyHeads(pi, ctx, model, "goal_completion", {
-			objective,
-			phase: "settlement",
-			evidence: recentEvidence(event.context.llmMessages),
-		}, {
-			goal_completion: {
-				type: "score",
-				instructions: "Rate whether the conversation provides evidence that the user's stated objective is complete.",
-				criteria: ["unmet", "partly met", "met"],
+		const answers = await classifyHeads(
+			pi,
+			ctx,
+			model,
+			"goal_completion",
+			{
+				objective,
+				phase: "settlement",
+				evidence: recentEvidence(event.context.llmMessages),
 			},
-		});
+			{
+				goal_completion: {
+					type: "score",
+					instructions:
+						"Rate whether the conversation provides evidence that the user's stated objective is complete.",
+					criteria: ["unmet", "partly met", "met"],
+				},
+			},
+		);
 		const completion = answers?.goal_completion;
 		if (completion?.type !== "score" || completion.confidence < 0.75) {
 			recordAudit(pi, { feature: "goal_completion", decision: "abstain" });
-			if (!shadow) ctx.ui.notify("Middlemanager could not verify that the objective is complete; review the result.", "warning");
+			if (!shadow)
+				ctx.ui.notify(
+					"Middlemanager could not verify that the objective is complete; review the result.",
+					"warning",
+				);
 			return undefined;
 		}
 		if (completion.score >= 2) {
@@ -388,12 +404,18 @@ export default function middlemanager(pi: ExtensionAPI) {
 		}
 		if (goalContinuationCount >= 1) {
 			recordAudit(pi, { feature: "goal_completion", decision: "unmet_after_continuation_limit" });
-			ctx.ui.notify("Middlemanager still sees unmet criteria after its one continuation; review the result.", "warning");
+			ctx.ui.notify(
+				"Middlemanager still sees unmet criteria after its one continuation; review the result.",
+				"warning",
+			);
 			return undefined;
 		}
 		if (!event.context.canContinue) {
 			recordAudit(pi, { feature: "goal_completion", decision: "unmet_no_runnable_context" });
-			ctx.ui.notify("Middlemanager found possible unmet criteria, but Pi has no runnable context to continue.", "warning");
+			ctx.ui.notify(
+				"Middlemanager found possible unmet criteria, but Pi has no runnable context to continue.",
+				"warning",
+			);
 			return undefined;
 		}
 
@@ -436,11 +458,26 @@ export default function middlemanager(pi: ExtensionAPI) {
 		const model = classifierFor(pi, ctx);
 		const shadow = pi.getFlag("middlemanager-shadow") !== false;
 		if (!model) {
-			recordAudit(pi, { feature: "tool_gate", decision: shadow ? "shadow_no_classifier" : "abstain_no_classifier", tool: event.toolName });
+			recordAudit(pi, {
+				feature: "tool_gate",
+				decision: shadow ? "shadow_no_classifier" : "abstain_no_classifier",
+				tool: event.toolName,
+			});
 			if (shadow) return undefined;
-			const approved = ctx.hasUI && (await ctx.ui.confirm("Middlemanager has no classifier; allow this action?", toolSummary(event).slice(0, 1_000)));
-			recordAudit(pi, { feature: "tool_gate", decision: approved ? "approved_by_user" : "blocked", userOverride: approved, tool: event.toolName });
-			if (!approved) return { block: true, reason: "Middlemanager has no classifier; explicit user approval is required" };
+			const approved =
+				ctx.hasUI &&
+				(await ctx.ui.confirm(
+					"Middlemanager has no classifier; allow this action?",
+					toolSummary(event).slice(0, 1_000),
+				));
+			recordAudit(pi, {
+				feature: "tool_gate",
+				decision: approved ? "approved_by_user" : "blocked",
+				userOverride: approved,
+				tool: event.toolName,
+			});
+			if (!approved)
+				return { block: true, reason: "Middlemanager has no classifier; explicit user approval is required" };
 			pendingToolOutcomes.set(event.toolCallId, { feature: "tool_gate", tool: event.toolName });
 			return undefined;
 		}
@@ -450,7 +487,11 @@ export default function middlemanager(pi: ExtensionAPI) {
 			questions.action_risk = {
 				type: "choice",
 				instructions: "Rate the operational risk of the proposed tool action.",
-				criteria: { low: "Reversible and local", review: "Unclear or externally visible", high: "Destructive or difficult to reverse" },
+				criteria: {
+					low: "Reversible and local",
+					review: "Unclear or externally visible",
+					high: "Destructive or difficult to reverse",
+				},
 			};
 		}
 		if (checkGoal) {
@@ -463,20 +504,32 @@ export default function middlemanager(pi: ExtensionAPI) {
 		if (checkEdit) {
 			questions.edit_alignment = {
 				type: "score",
-				instructions: "Rate whether this proposed edit is semantically aligned with the objective and requested scope.",
+				instructions:
+					"Rate whether this proposed edit is semantically aligned with the objective and requested scope.",
 				criteria: ["conflicts", "weakly related", "aligned"],
 			};
 		}
 
-		const answers = await classifyHeads(pi, ctx, model, "tool_gate", {
-			objective,
-			phase: "tool_call",
-			tool: event.toolName,
-			proposal: toolSummary(event),
-		}, questions);
+		const answers = await classifyHeads(
+			pi,
+			ctx,
+			model,
+			"tool_gate",
+			{
+				objective,
+				phase: "tool_call",
+				tool: event.toolName,
+				proposal: toolSummary(event),
+			},
+			questions,
+		);
 		const review = requiresReview(answers);
 		if (shadow) {
-			recordAudit(pi, { feature: "tool_gate", decision: review ? "shadow_would_escalate" : "shadow_allow", tool: event.toolName });
+			recordAudit(pi, {
+				feature: "tool_gate",
+				decision: review ? "shadow_would_escalate" : "shadow_allow",
+				tool: event.toolName,
+			});
 			pendingToolOutcomes.set(event.toolCallId, { feature: "tool_gate", tool: event.toolName });
 			return undefined;
 		}
@@ -485,7 +538,8 @@ export default function middlemanager(pi: ExtensionAPI) {
 			pendingToolOutcomes.set(event.toolCallId, { feature: "tool_gate", tool: event.toolName });
 			return undefined;
 		}
-		const approved = ctx.hasUI && (await ctx.ui.confirm("Review proposed tool action", toolSummary(event).slice(0, 1_000)));
+		const approved =
+			ctx.hasUI && (await ctx.ui.confirm("Review proposed tool action", toolSummary(event).slice(0, 1_000)));
 		recordAudit(pi, {
 			feature: "tool_gate",
 			decision: approved ? "approved_by_user" : "blocked",
@@ -535,23 +589,26 @@ export default function middlemanager(pi: ExtensionAPI) {
 						{
 							decision: {
 								type: "choice",
-								instructions: "Choose the option best supported by the user's stated preference and task context.",
+								instructions:
+									"Choose the option best supported by the user's stated preference and task context.",
 								criteria: Object.fromEntries(params.options.map((option) => [option.id, option.description])),
 							},
 						},
 					)
 				: undefined;
 			const selected = chooseBoundedOption(answers?.decision, params.options, params.reversible, params.consequence);
-			const automatic = selected !== undefined && pi.getFlag("middlemanager-autopilot") === true && pi.getFlag("middlemanager-shadow") === false;
+			const automatic =
+				selected !== undefined &&
+				pi.getFlag("middlemanager-autopilot") === true &&
+				pi.getFlag("middlemanager-shadow") === false;
 			let output: { status: string; choice?: string; recommendation?: string; userOverride?: boolean };
 			if (automatic) {
 				output = { status: "selected", choice: selected };
 			} else if (ctx.hasUI) {
 				const labels = params.options.map((option) => `${option.id}: ${redactText(option.description, 300)}`);
 				const selectedLabel = await ctx.ui.select(params.question, labels);
-				const selectedOption = params.options.find(
-					(option, index) => labels[index] === selectedLabel,
-				);
+				const selectedIndex = labels.indexOf(selectedLabel ?? "");
+				const selectedOption = selectedIndex >= 0 ? params.options[selectedIndex] : undefined;
 				output = selectedOption
 					? {
 							status: "user_selected",

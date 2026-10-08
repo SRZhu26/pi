@@ -1,12 +1,11 @@
-import { describe, expect, it } from "vitest";
-import type { ClassifierApi, ClassifierAnswer, ClassifierContext, ClassifierModel } from "@earendil-works/pi-ai";
+import type { ClassifierAnswer, ClassifierApi, ClassifierContext, ClassifierModel } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import {
+import { describe, expect, it } from "vitest";
+import middlemanager, {
 	chooseBoundedOption,
 	rankMemoryFiles,
 	requiresConfirmation,
 } from "../examples/extensions/middlemanager/index.ts";
-import middlemanager from "../examples/extensions/middlemanager/index.ts";
 
 function createExtensionHarness() {
 	const flags = new Map<string, boolean | string>();
@@ -73,7 +72,12 @@ function createExtensionHarness() {
 	const context = {
 		modelRegistry,
 		hasUI: false,
-		ui: { notify() {}, async select() { return userSelectedOption; } },
+		ui: {
+			notify() {},
+			async select() {
+				return userSelectedOption;
+			},
+		},
 		signal: undefined,
 	} as unknown as ExtensionContext;
 	middlemanager(api);
@@ -85,8 +89,12 @@ function createExtensionHarness() {
 		requests,
 		context,
 		registeredTool,
-		setCompletionScore: (score: number) => (completionScore = score),
-		setUserSelectedOption: (option: string | undefined) => (userSelectedOption = option),
+		setCompletionScore(score: number) {
+			completionScore = score;
+		},
+		setUserSelectedOption(option: string | undefined) {
+			userSelectedOption = option;
+		},
 	};
 }
 
@@ -115,12 +123,7 @@ describe("middlemanager decision helpers", () => {
 		expect(chooseBoundedOption(answer, options, false, "low")).toBeUndefined();
 		expect(chooseBoundedOption(answer, options, true, "medium")).toBeUndefined();
 		expect(
-			chooseBoundedOption(
-				{ ...answer, probabilities: { cached: 0.58, latest: 0.42 } },
-				options,
-				true,
-				"low",
-			),
+			chooseBoundedOption({ ...answer, probabilities: { cached: 0.58, latest: 0.42 } }, options, true, "low"),
 		).toBeUndefined();
 	});
 

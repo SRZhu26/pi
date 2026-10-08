@@ -1,5 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -44,7 +44,11 @@ function parseArgs(args: readonly string[], environment: NodeJS.ProcessEnv): Cli
 		const argument = args[index];
 		const equalsIndex = argument.indexOf("=");
 		const name = equalsIndex === -1 ? argument : argument.slice(0, equalsIndex);
-		if (!new Set(["--tasks", "--arms", "--output", "--model", "--classifier-model", "--repetitions", "--seed"]).has(name)) {
+		if (
+			!new Set(["--tasks", "--arms", "--output", "--model", "--classifier-model", "--repetitions", "--seed"]).has(
+				name,
+			)
+		) {
 			throw new Error(`Unsupported Middlemanager planner argument: ${argument}`);
 		}
 		const value = equalsIndex === -1 ? args[index + 1] : argument.slice(equalsIndex + 1);
@@ -61,7 +65,8 @@ function parseArgs(args: readonly string[], environment: NodeJS.ProcessEnv): Cli
 	if (!classifierModel) throw new Error("Pass --classifier-model provider/model-id or set PI_MIDDLEMANAGER_MODEL.");
 	const repetitionsText = values.get("--repetitions") ?? environment.PI_MIDDLEMANAGER_REPETITIONS ?? "1";
 	const seedText = values.get("--seed") ?? environment.PI_MIDDLEMANAGER_SEED;
-	if (seedText === undefined) throw new Error("Pass --seed or set PI_MIDDLEMANAGER_SEED to make arm order reproducible.");
+	if (seedText === undefined)
+		throw new Error("Pass --seed or set PI_MIDDLEMANAGER_SEED to make arm order reproducible.");
 	return {
 		tasksFile: resolve(packageRoot, taskFile),
 		armsFile: resolve(packageRoot, values.get("--arms") ?? "experiments/middlemanager/arms.json"),
@@ -166,7 +171,10 @@ const protocolDigest = sha256(JSON.stringify(protocolBody));
 const protocol = { ...protocolBody, protocolDigest };
 await mkdir(dirname(outputFile), { recursive: true });
 await writeFile(outputFile, `${JSON.stringify(protocol, null, 2)}\n`);
-await writeFile(outputFile.replace(/\.json$/i, ".expected-observations.json"), `${JSON.stringify(expectedObservations, null, 2)}\n`);
+await writeFile(
+	outputFile.replace(/\.json$/i, ".expected-observations.json"),
+	`${JSON.stringify(expectedObservations, null, 2)}\n`,
+);
 console.log(`Protocol: ${outputFile}`);
 console.log(`Protocol SHA-256: ${protocolDigest}`);
 console.log(`Tasks: ${cases.length}; planned runs: ${tasks.length}; seed: ${options.seed}`);
