@@ -31,6 +31,13 @@ export const SWE_BENCH_AGENT_MODEL = {
 	noProxyHost: "172.16.125.60",
 } as const;
 
+export const SWE_BENCH_CLASSIFIER_MODEL = {
+	provider: "llama.cpp",
+	id: "LiquidAI/d1-omni-600M-GGUF:Q8_0",
+	baseUrl: "http://127.0.0.1:8080",
+	noProxyHost: "127.0.0.1",
+} as const;
+
 export interface ExperimentArm {
 	id: string;
 	kind: "baseline" | "middlemanager";

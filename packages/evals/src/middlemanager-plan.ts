@@ -11,6 +11,7 @@ import {
 	parseModelIdentity,
 	parseSweBenchLiteTaskSet,
 	SWE_BENCH_AGENT_MODEL,
+	SWE_BENCH_CLASSIFIER_MODEL,
 } from "./middlemanager-experiment.ts";
 
 interface CliOptions {
@@ -65,7 +66,7 @@ function parseArgs(args: readonly string[], environment: NodeJS.ProcessEnv): Cli
 	const classifierModel =
 		values.get("--classifier-model") ??
 		environment.PI_MIDDLEMANAGER_MODEL ??
-		`${SWE_BENCH_AGENT_MODEL.provider}/${SWE_BENCH_AGENT_MODEL.id}`;
+		`${SWE_BENCH_CLASSIFIER_MODEL.provider}/${SWE_BENCH_CLASSIFIER_MODEL.id}`;
 	if (!model) throw new Error("Pass --model provider/model-id or set PI_PROVIDER and PI_MODEL.");
 	const repetitionsText = values.get("--repetitions") ?? environment.PI_MIDDLEMANAGER_REPETITIONS ?? "1";
 	const seedText = values.get("--seed") ?? environment.PI_MIDDLEMANAGER_SEED;
@@ -135,6 +136,7 @@ const expectedObservations = tasks.map((task) => ({
 const noProxy = [
 	...new Set(
 		[process.env.NO_PROXY, process.env.no_proxy, SWE_BENCH_AGENT_MODEL.noProxyHost]
+			.concat(SWE_BENCH_CLASSIFIER_MODEL.noProxyHost)
 			.flatMap((value) => value?.split(",") ?? [])
 			.map((host) => host.trim())
 			.filter(Boolean),
@@ -152,6 +154,7 @@ const launchConfigByArm = Object.fromEntries(
 					PI_PROVIDER: SWE_BENCH_AGENT_MODEL.provider,
 					PI_MODEL: SWE_BENCH_AGENT_MODEL.id,
 					PI_MIDDLEMANAGER_MODEL: options.classifierModel,
+					LLAMA_BASE_URL: process.env.LLAMA_BASE_URL ?? SWE_BENCH_CLASSIFIER_MODEL.baseUrl,
 					OPENAI_API_KEY: "local",
 					NO_PROXY: noProxy,
 					no_proxy: noProxy,
@@ -185,6 +188,11 @@ const protocolBody = {
 				samplingParams: SWE_BENCH_AGENT_MODEL.samplingParams,
 			},
 		],
+				classifier: {
+					provider: SWE_BENCH_CLASSIFIER_MODEL.provider,
+					id: SWE_BENCH_CLASSIFIER_MODEL.id,
+					baseUrl: process.env.LLAMA_BASE_URL ?? SWE_BENCH_CLASSIFIER_MODEL.baseUrl,
+				},
 	},
 	repetitions: options.repetitions,
 	seed: options.seed,

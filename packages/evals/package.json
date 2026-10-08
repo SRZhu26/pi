@@ -10,6 +10,9 @@
 		"eval:docs": "node --experimental-strip-types src/cli.ts",
 		"eval:middlemanager:dataset": "node --experimental-strip-types src/middlemanager-swebench-lite.ts",
 		"eval:middlemanager:plan": "node --experimental-strip-types src/middlemanager-plan.ts",
+		"eval:middlemanager:run": "node --experimental-strip-types src/middlemanager-run.ts",
+		"eval:middlemanager:official": "node --experimental-strip-types src/middlemanager-swebench-evaluator.ts",
+		"eval:middlemanager:report": "node --experimental-strip-types src/middlemanager-report.ts",
 		"test": "vitest run --config vitest.test.config.ts"
 	},
 	"devDependencies": {
