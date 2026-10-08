@@ -106,8 +106,11 @@ export function parseExperimentArms(value: unknown): ExperimentArm[] {
 		if (raw.kind === "middlemanager" && typeof raw.shadow !== "boolean") {
 			throw new TypeError(`Middlemanager arm ${raw.id} requires an explicit shadow setting.`);
 		}
-		if (raw.kind === "external" && (typeof raw.repository !== "string" || typeof raw.ref !== "string")) {
-			throw new TypeError(`External arm ${raw.id} requires a repository and pinned ref.`);
+		if (
+			raw.kind === "external" &&
+			(typeof raw.repository !== "string" || typeof raw.ref !== "string" || !/^[a-f0-9]{40}$/i.test(raw.ref))
+		) {
+			throw new TypeError(`External arm ${raw.id} requires a repository and full pinned commit SHA.`);
 		}
 		return {
 			id: raw.id,

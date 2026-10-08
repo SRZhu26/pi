@@ -6,7 +6,7 @@ This experiment matrix separates optimization tasks from general goal tasks. The
 
 Copy `tasks.template.json` to a versioned task file and replace every placeholder. Each task needs a stable ID, a frozen prompt, acceptance criteria, and a task-specific evaluation. Optimization tasks must specify a deterministic benchmark command, baseline, target, direction, and unit. Goal tasks must include a rubric suitable for blinded scoring. Do not compare optimization and goal results as one headline.
 
-Record the starting Pi commit, coding model, classifier model, comparator commit SHAs, benchmark environment, and task-set hash with every run. Pin each external comparator to a commit before collecting results; `main` in `arms.json` is a discovery placeholder and is not a reproducible evaluation ref.
+Record the starting Pi commit, coding model, classifier model, comparator commit SHAs, benchmark environment, and task-set hash with every run. The external comparators in `arms.json` are pinned to full commit SHAs; update those pins deliberately when selecting a new comparator revision.
 
 ## Feature Environment
 

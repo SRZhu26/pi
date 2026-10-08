@@ -84,7 +84,7 @@
 			"domains": ["optimization"],
 			"features": [],
 			"repository": "https://github.com/davebcn87/pi-autoresearch",
-			"ref": "main"
+			"ref": "04b8a50dac7efe80ffc91648bd00ed9b022e24c2"
 		},
 		{
 			"id": "pi-goal-x",
@@ -92,7 +92,7 @@
 			"domains": ["goal"],
 			"features": [],
 			"repository": "https://github.com/tmonk/pi-goal-x",
-			"ref": "main"
+			"ref": "64c5ace87f3400c0b55ef87f2d2912167f53dbaa"
 		}
 	]
 }

@@ -59,5 +59,10 @@ describe("Middlemanager experiment plan", () => {
 			}),
 		).toThrow("measurable baseline");
 		expect(() => parseExperimentArms({ schemaVersion: 1, arms: [armMatrix[0]] })).toThrow("middlemanager-full");
+		const floatingComparator = {
+			schemaVersion: 1,
+			arms: armMatrix.map((arm) => ({ ...arm, ...(arm.id === "pi-autoresearch" ? { ref: "main" } : {}) })),
+		};
+		expect(() => parseExperimentArms(floatingComparator)).toThrow("full pinned commit SHA");
 	});
 });
